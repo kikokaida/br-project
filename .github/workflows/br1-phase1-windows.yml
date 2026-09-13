@@ -36,6 +36,7 @@ jobs:
             throw 'The supplied Windows build package SHA256 does not match.'
           }
           Expand-Archive -LiteralPath $archive -DestinationPath br1_build_job
+          Copy-Item -LiteralPath phase1-ci/Build-CI.ps1 -Destination br1_build_job/Build-CI.ps1
           Write-Host 'PASS: exact supplied build package SHA256 verified.'
           Write-Host 'Build-CI.ps1 must verify the patch and all 56 source manifest hashes before compilation.'
 

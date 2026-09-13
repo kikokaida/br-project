@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/br1-phase1-recorder.yml'
       - 'phase1-tests/**'
+      - 'phase1-ci/**'
       - 'BR1_PHASE1_Windows_Build_Job*.zip'
 
 permissions:

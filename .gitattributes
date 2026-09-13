@@ -1,0 +1,6 @@
+BR1_UPBGE_Phase1.patch -text
+*.ps1 text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+phase1-ci/*.patch -text
+*.json text eol=lf

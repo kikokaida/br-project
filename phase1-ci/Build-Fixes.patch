@@ -1,0 +1,23 @@
+diff --git a/diagnostics/br1_phase1/Build-Windows.ps1 b/diagnostics/br1_phase1/Build-Windows.ps1
+--- a/diagnostics/br1_phase1/Build-Windows.ps1
++++ b/diagnostics/br1_phase1/Build-Windows.ps1
+@@ -35,7 +35,7 @@
+     throw 'Exact Windows dependency gitlink could not be resolved; do not substitute arbitrary libraries.'
+ }
+ $LibraryCommit = $Matches[1]
+-$LibDir = Join-Path $SourceRoot 'lib\windows_x64'
++$LibDir = (Join-Path $SourceRoot 'lib\windows_x64').Replace('\', '/')
+ if (!(Test-Path (Join-Path $LibDir '.git'))) {
+     git clone --no-checkout https://projects.blender.org/blender/lib-windows_x64.git $LibDir
+     Check-Exit 'Clone isolated Windows libraries'
+diff --git a/source/blender/blenlib/intern/br1_diagnostics.cc b/source/blender/blenlib/intern/br1_diagnostics.cc
+--- a/source/blender/blenlib/intern/br1_diagnostics.cc
++++ b/source/blender/blenlib/intern/br1_diagnostics.cc
+@@ -15,6 +15,7 @@
+ #include <iomanip>
+ #include <memory>
+ #include <mutex>
++#include <string>
+ #include <thread>
+ #include <vector>
+ 
