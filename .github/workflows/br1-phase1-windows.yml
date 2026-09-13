@@ -45,6 +45,12 @@ jobs:
         shell: pwsh
         run: ./br1_build_job/Build-CI.ps1 -Jobs 2
 
+      - name: Check installed runtime executables
+        if: ${{ always() && steps.build.outputs.engine_available == 'true' }}
+        timeout-minutes: 5
+        shell: pwsh
+        run: ./phase1-ci/Test-Installed-Runtime.ps1
+
       - name: Preserve build status and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -64,5 +70,19 @@ jobs:
             br1_build_job/br1_ci_work/upbge/diagnostics/br1_phase1/
             br1_build_job/br1_ci_work/logs/
           if-no-files-found: error
+          compression-level: 1
+          retention-days: 7
+
+      - name: Preserve compiled outputs for failure recovery
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: BR1-Phase1-recovery-NOT-RELEASE-${{ github.run_id }}
+          path: |
+            br1_build_job/br1_ci_work/BR1_PHASE1_engine/
+            br1_build_job/br1_ci_work/BR1_PHASE1_build/bin/
+            br1_build_job/br1_ci_work/BR1_PHASE1_build/Testing/
+            br1_build_job/br1_ci_work/logs/
+          if-no-files-found: warn
           compression-level: 1
           retention-days: 7

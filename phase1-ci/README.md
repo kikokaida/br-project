@@ -16,6 +16,13 @@ The following actual Windows failures were diagnosed:
    which bf_python does not define; include it unconditionally in this Python-only
    translation unit. All instrumentation scopes and executable statements remain.
 
+4. Full engine packaging attempt: https://github.com/kikokaida/br-project/actions/runs/34770560128
+   Both blender.exe and blenderplayer.exe compiled and linked successfully. The
+   pinned player CMake rules install the player only on Apple, so the Windows
+   install was missing blenderplayer.exe. Copy the same-build player (and its PDB
+   when present) beside the installed Blender executable and shared runtime.
+   Preserve JUnit test results and run installed executable startup checks.
+
 The original diagnostic ZIP and patch remain byte-for-byte unchanged. Both jobs
 verify all 56 original hashes, apply the reviewed supplemental patch, then verify
 all 56 effective hashes against expected values before compiling. Logs contain
@@ -24,7 +31,7 @@ both manifests, SOURCE_VERIFICATION.json, and Build-Fixes.patch.
 - Source: b1b35c48872b32c8bd4134f0cba759224b40f8df
 - Windows dependencies: 854341cfd7e21b2cc45c7f8edbf19543cb51519c
 - Original patch SHA256: 3d4b39ceb54abb37f5ef7d86bf67de86f24cdc0c8cfcc8198a53db9d97c94264
-- Supplemental fixes SHA256: d7b9066bdbbd85c0c6e6ee8c0a6de943983ac33ec050b63a7e12c2d226d7bcde
+- Supplemental fixes SHA256: a719a5ea3a9645724a23e44e980a340ff8a6f470ed88691526216a0c62987897
 
 Actual runner: Windows Server 2022 x64, Visual Studio 2022 17.14.39, MSVC
 19.44.35228.0, Windows SDK 10.0.26100.0, and pinned Python 3.11.13.

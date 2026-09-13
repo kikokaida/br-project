@@ -10,6 +10,38 @@ diff --git a/diagnostics/br1_phase1/Build-Windows.ps1 b/diagnostics/br1_phase1/B
  if (!(Test-Path (Join-Path $LibDir '.git'))) {
      git clone --no-checkout https://projects.blender.org/blender/lib-windows_x64.git $LibDir
      Check-Exit 'Clone isolated Windows libraries'
+@@ -59,6 +59,15 @@
+ Check-Exit 'Compile and link UPBGE'
+ cmake --install $BuildRoot --config RelWithDebInfo
+ Check-Exit 'Install separate diagnostic engine'
++# This pinned UPBGE revision has no Windows install rule for blenderplayer.
++# Use the executable from the same successful build and Blender's shared runtime.
++$Br1BuiltPlayer = Join-Path $BuildRoot 'bin\RelWithDebInfo\blenderplayer.exe'
++if (!(Test-Path -LiteralPath $Br1BuiltPlayer)) { throw 'Compiled blenderplayer.exe is missing.' }
++Copy-Item -LiteralPath $Br1BuiltPlayer -Destination $InstallRoot
++$Br1BuiltPlayerPdb = Join-Path $BuildRoot 'bin\RelWithDebInfo\blenderplayer.pdb'
++if (Test-Path -LiteralPath $Br1BuiltPlayerPdb) {
++    Copy-Item -LiteralPath $Br1BuiltPlayerPdb -Destination $InstallRoot
++}
+ foreach ($Executable in @('blender.exe', 'blenderplayer.exe')) {
+     if (!(Test-Path (Join-Path $InstallRoot $Executable))) { throw "Missing installed $Executable" }
+ }
+@@ -74,11 +83,13 @@
+ try {
+     $env:PATH = "$PythonDir\bin;$PythonDir;$SavedPath"
+     ctest --test-dir $TestsRoot -C RelWithDebInfo --output-on-failure `
+-        --output-log (Join-Path $BuildRoot 'RECORDER_TESTS.log')
++        --no-tests=error --output-log (Join-Path $BuildRoot 'RECORDER_TESTS.log') `
++        --output-junit (Join-Path $BuildRoot 'RECORDER_TESTS.xml')
+     Check-Exit 'Recorder integration and report tests'
+ } finally { $env:PATH = $SavedPath }
+ ctest --test-dir $BuildRoot -C RelWithDebInfo --output-on-failure `
+-    --output-log (Join-Path $BuildRoot 'ENGINE_TESTS.log')
++    --no-tests=error --output-log (Join-Path $BuildRoot 'ENGINE_TESTS.log') `
++    --output-junit (Join-Path $BuildRoot 'ENGINE_TESTS.xml')
+ Check-Exit 'Available upstream tests'
+ Write-Host "Diagnostic engine built at $InstallRoot"
+ Write-Host 'The existing project engine and PLAY.bat have not been changed.'
 diff --git a/source/blender/blenlib/intern/br1_diagnostics.cc b/source/blender/blenlib/intern/br1_diagnostics.cc
 --- a/source/blender/blenlib/intern/br1_diagnostics.cc
 +++ b/source/blender/blenlib/intern/br1_diagnostics.cc

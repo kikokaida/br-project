@@ -128,7 +128,7 @@ try {
     $Br1Result['finished_utc'] = [DateTime]::UtcNow.ToString('o')
     $Br1Result | ConvertTo-Json -Depth 6 |
         Set-Content -Encoding utf8 (Join-Path $Br1Logs 'BUILD_STATUS.json')
-    foreach ($Br1Name in @('DEPENDENCY_LOCK.json', 'CMakeCache.txt', 'RECORDER_TESTS.log', 'ENGINE_TESTS.log')) {
+    foreach ($Br1Name in @('DEPENDENCY_LOCK.json', 'CMakeCache.txt', 'RECORDER_TESTS.log', 'ENGINE_TESTS.log', 'RECORDER_TESTS.xml', 'ENGINE_TESTS.xml')) {
         $Br1Log = Join-Path $Br1Build $Br1Name
         if (Test-Path -LiteralPath $Br1Log) {
             Copy-Item -LiteralPath $Br1Log -Destination $Br1Logs -ErrorAction Continue
