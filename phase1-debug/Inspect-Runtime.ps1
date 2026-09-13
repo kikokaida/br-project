@@ -40,8 +40,9 @@ try {
         $Log = Join-Path $LogsDir ($Name + '.log')
         $CommandFile = Join-Path $LogsDir ($Name + '.cdb')
         @('sxe -c ".echo BR1_ACCESS_VIOLATION; .ecxr; kv 50; q" av',
-          'sxe -c ".echo BR1_FAST_FAIL; .ecxr; kv 50; q" 0xc0000409',
+          'sxe -c2 ".echo BR1_FAST_FAIL; .ecxr; kv 50; q" 0xc0000409',
           ('bm ' + $Module + '!*MEM_trigger_error_on_memory_block* ".echo BR1_ALLOCATOR_ERROR; kv 50; q"'),
+          ('bm ' + $Module + '!*MemorY_ErroR* ".echo BR1_ALLOCATOR_ERROR; kv 50; q"'),
           'g') | Set-Content -Encoding ascii -LiteralPath $CommandFile
         $StartInfo = [Diagnostics.ProcessStartInfo]::new()
         $StartInfo.FileName = $Cdb
@@ -64,7 +65,7 @@ try {
     $Results += Invoke-Br1Debugger 'blender_guarded_background' $Blender @('--debug-memory','--background','--factory-startup','--python-exit-code','1','--python-expr','print("BR1_GUARDED_BODY_PASSED")') 'blender'
     $TestExe = Get-ChildItem -Path (Join-Path $ArtifactRoot 'BR1_PHASE1_build\bin') -Filter 'blender_test.exe' -Recurse -File | Select-Object -First 1
     if ($TestExe) {
-        $Results += Invoke-Br1Debugger 'native_blendfile_canary' $TestExe.FullName @('--gtest_filter=BlendfileLoadingTest.CanaryTest',('--test-assets-dir=' + $ArtifactRoot),('--test-release-dir=' + (Join-Path $Engine '5.0'))) 'blender_test'
+        $Results += Invoke-Br1Debugger 'native_nodes' $TestExe.FullName @('--gtest_filter=NodeTest.*',('--test-assets-dir=' + $ArtifactRoot),('--test-release-dir=' + (Join-Path $Engine '5.0'))) 'blender_test'
     }
     $Results | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $LogsDir 'DEBUGGER_RESULTS.json')
     Get-ChildItem -Path $env:TEMP -Filter '*.crash.txt' -Recurse -File -ErrorAction SilentlyContinue | Copy-Item -Destination $LogsDir -ErrorAction Continue
