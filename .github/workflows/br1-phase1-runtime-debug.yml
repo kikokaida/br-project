@@ -1,0 +1,38 @@
+name: BR1 Phase 1 retained-runtime investigation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/br1-phase1-runtime-debug.yml'
+      - 'phase1-debug/**'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Retrieve same-build executables and symbols
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: '10325016359'
+          run-id: '34774349378'
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: retained
+      - name: Capture native failure call stacks
+        shell: pwsh
+        run: ./phase1-debug/Inspect-Runtime.ps1
+      - name: Preserve runtime investigation logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: BR1-Phase1-runtime-debug-${{ github.run_id }}
+          path: runtime-debug-logs/
+          if-no-files-found: warn
+          retention-days: 7
