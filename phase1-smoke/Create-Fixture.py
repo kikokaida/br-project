@@ -13,6 +13,10 @@ cube.name = 'BR1_SmokeCube'
 bpy.context.view_layer.objects.active = cube
 cube.select_set(True)
 bpy.data.texts.load(str(root / 'br1_smoke_component.py'))
+# UPBGE's component operator pushes editor undo state. Background mode leaves
+# that stack unset unless the script explicitly initializes it first.
+print('BR1_FIXTURE_STAGE: initializing background undo', flush=True)
+assert bpy.ops.ed.undo_push(message='Initialize isolated component fixture') == {'FINISHED'}
 print('BR1_FIXTURE_STAGE: registering component', flush=True)
 result = bpy.ops.logic.python_component_register(component_name='br1_smoke_component.Phase1Smoke')
 print('BR1_FIXTURE_STAGE: component registered', result, flush=True)
