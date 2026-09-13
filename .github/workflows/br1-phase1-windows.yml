@@ -1,0 +1,67 @@
+name: BR1 Phase 1 diagnostic Windows engine
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/br1-phase1-windows.yml'
+      - 'BR1_PHASE1_Windows_Build_Job*.zip'
+      - 'phase1-ci/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: br1-phase1-windows
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    steps:
+      - name: Check out build job
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Verify and unpack supplied build package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = 'BR1_PHASE1_Windows_Build_Job (1).zip'
+          $expected = '2800303f0d07e601cb9611fd434631a6c7f850e8339f7daf20b4f705fe884718'
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expected) {
+            throw 'The supplied Windows build package SHA256 does not match.'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath br1_build_job
+          Write-Host 'PASS: exact supplied build package SHA256 verified.'
+          Write-Host 'Build-CI.ps1 must verify the patch and all 56 source manifest hashes before compilation.'
+
+      - name: Compile and test the exact Phase 1 fork
+        id: build
+        shell: pwsh
+        run: ./br1_build_job/Build-CI.ps1 -Jobs 2
+
+      - name: Preserve build status and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: BR1-Phase1-build-logs-${{ github.run_id }}
+          path: br1_build_job/br1_ci_work/logs/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Collect diagnostic engine and benchmark tools
+        if: ${{ always() && steps.build.outputs.engine_available == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: BR1-Phase1-Windows-x64-gameplay-unverified-${{ github.run_id }}
+          path: |
+            br1_build_job/br1_ci_work/BR1_PHASE1_engine/
+            br1_build_job/br1_ci_work/upbge/diagnostics/br1_phase1/
+            br1_build_job/br1_ci_work/logs/
+          if-no-files-found: error
+          compression-level: 1
+          retention-days: 7
