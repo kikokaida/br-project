@@ -33,20 +33,31 @@ try {
     (Get-Item $Cdb).VersionInfo | Format-List
     $Symbols = @($Engine)
     $Symbols += @(Get-ChildItem -Path $ArtifactRoot -Filter '*.pdb' -Recurse -File | ForEach-Object DirectoryName | Sort-Object -Unique)
+    Get-ChildItem -Path $ArtifactRoot -Filter '*.pdb' -Recurse -File | Select-Object FullName,Length | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $LogsDir 'SYMBOL_INVENTORY.json')
     $SymbolPath = ($Symbols -join ';') + ';srv*' + (Join-Path $env:RUNNER_TEMP 'br1-symbols') + '*https://msdl.microsoft.com/download/symbols'
     $Results = @()
     function Invoke-Br1Debugger([string]$Name, [string]$Executable, [string[]]$Arguments, [string]$Module) {
         $Log = Join-Path $LogsDir ($Name + '.log')
-        $Command = 'sxe -c ".echo BR1_ACCESS_VIOLATION; .ecxr; kv 50; q" av; sxe -c ".echo BR1_FAST_FAIL; .ecxr; kv 50; q" 0xc0000409; bu ' + $Module + '!MEM_trigger_error_on_memory_block ".echo BR1_ALLOCATOR_ERROR; kv 50; q"; g'
+        $CommandFile = Join-Path $LogsDir ($Name + '.cdb')
+        @('sxe -c ".echo BR1_ACCESS_VIOLATION; .ecxr; kv 50; q" av',
+          'sxe -c ".echo BR1_FAST_FAIL; .ecxr; kv 50; q" 0xc0000409',
+          ('bm ' + $Module + '!*MEM_trigger_error_on_memory_block* ".echo BR1_ALLOCATOR_ERROR; kv 50; q"'),
+          'g') | Set-Content -Encoding ascii -LiteralPath $CommandFile
         $StartInfo = [Diagnostics.ProcessStartInfo]::new()
         $StartInfo.FileName = $Cdb
         $StartInfo.WorkingDirectory = Split-Path $Executable -Parent
         $StartInfo.UseShellExecute = $false
-        foreach ($Arg in @('-o','-G','-lines','-y',$SymbolPath,'-logo',$Log,'-c',$Command,$Executable) + $Arguments) { $StartInfo.ArgumentList.Add($Arg) }
+        if ($Module -eq 'blender_test') {
+            # CTest supplies library paths for its build-tree test executable.
+            # Reconstruct those paths from the same retained installed runtime.
+            $StartInfo.Environment['PATH'] = (Join-Path $Engine 'blender.shared') + ';' + (Join-Path $Engine '5.0\python\bin') + ';' + $Engine + ';' + $env:PATH
+        }
+        foreach ($Arg in @('-o','-G','-lines','-y',$SymbolPath,'-logo',$Log,'-cf',$CommandFile,$Executable) + $Arguments) { $StartInfo.ArgumentList.Add($Arg) }
         $Process = [Diagnostics.Process]::Start($StartInfo)
         $Finished = $Process.WaitForExit(180000)
         if (!$Finished) { $Process.Kill($true); $Process.WaitForExit() }
-        [ordered]@{name=$Name; debugger_exit_code=$Process.ExitCode; timed_out=(!$Finished); executable=$Executable; arguments=$Arguments}
+        $Captured = (Get-Content -Raw $Log) -match '(?m)^BR1_(ACCESS_VIOLATION|FAST_FAIL|ALLOCATOR_ERROR)\s*$'
+        [ordered]@{name=$Name; failure_stack_captured=$Captured; debugger_exit_code=$Process.ExitCode; timed_out=(!$Finished); executable=$Executable; arguments=$Arguments}
     }
     $env:BR1_DIAG = '0'
     $Results += Invoke-Br1Debugger 'player_help' $Player @('-h') 'blenderplayer'
