@@ -1,0 +1,34 @@
+name: BR1 Phase 1 Windows recorder tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/br1-phase1-recorder.yml'
+      - 'phase1-tests/**'
+      - 'BR1_PHASE1_Windows_Build_Job*.zip'
+
+permissions:
+  contents: read
+
+jobs:
+  recorder:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Check out supplied build job
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Compile and run exact Phase 1 recorder tests with pinned Python
+        shell: pwsh
+        run: ./phase1-tests/Run-Windows-Tests.ps1 -Jobs 2
+      - name: Preserve actual Windows recorder results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: BR1-Phase1-Windows-recorder-logs-${{ github.run_id }}
+          path: br1_recorder_work/logs/
+          if-no-files-found: error
+          retention-days: 7
