@@ -52,7 +52,7 @@ try {
             # Reconstruct those paths from the same retained installed runtime.
             $StartInfo.Environment['PATH'] = (Join-Path $Engine 'blender.shared') + ';' + (Join-Path $Engine '5.0\python\bin') + ';' + $Engine + ';' + $env:PATH
         }
-        foreach ($Arg in @('-o','-G','-lines','-y',$SymbolPath,'-logo',$Log,'-cf',$CommandFile,$Executable) + $Arguments) { $StartInfo.ArgumentList.Add($Arg) }
+        foreach ($Arg in @('-G','-lines','-y',$SymbolPath,'-logo',$Log,'-cf',$CommandFile,$Executable) + $Arguments) { $StartInfo.ArgumentList.Add($Arg) }
         $Process = [Diagnostics.Process]::Start($StartInfo)
         $Finished = $Process.WaitForExit(180000)
         if (!$Finished) { $Process.Kill($true); $Process.WaitForExit() }
@@ -64,7 +64,7 @@ try {
     $Results += Invoke-Br1Debugger 'blender_guarded_background' $Blender @('--debug-memory','--background','--factory-startup','--python-exit-code','1','--python-expr','print("BR1_GUARDED_BODY_PASSED")') 'blender'
     $TestExe = Get-ChildItem -Path (Join-Path $ArtifactRoot 'BR1_PHASE1_build\bin') -Filter 'blender_test.exe' -Recurse -File | Select-Object -First 1
     if ($TestExe) {
-        $Results += Invoke-Br1Debugger 'native_blendfile_canary' $TestExe.FullName @('--gtest_filter=BlendfileLoadingTest.CanaryTest') 'blender_test'
+        $Results += Invoke-Br1Debugger 'native_blendfile_canary' $TestExe.FullName @('--gtest_filter=BlendfileLoadingTest.CanaryTest',('--test-assets-dir=' + $ArtifactRoot),('--test-release-dir=' + (Join-Path $Engine '5.0'))) 'blender_test'
     }
     $Results | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $LogsDir 'DEBUGGER_RESULTS.json')
     Get-ChildItem -Path $env:TEMP -Filter '*.crash.txt' -Recurse -File -ErrorAction SilentlyContinue | Copy-Item -Destination $LogsDir -ErrorAction Continue
