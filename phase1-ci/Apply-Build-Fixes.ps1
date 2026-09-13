@@ -6,7 +6,7 @@ Set-StrictMode -Version Latest
 $PSNativeCommandUseErrorActionPreference = $false
 $Br1OriginalPatchHash = '3d4b39ceb54abb37f5ef7d86bf67de86f24cdc0c8cfcc8198a53db9d97c94264'
 $Br1SourceCommit = 'b1b35c48872b32c8bd4134f0cba759224b40f8df'
-$Br1FixHash = '4513c30601bdfb4629c1895a75db145a9ac9e1dffd152be252450daa99cc5fc9'
+$Br1FixHash = 'd7b9066bdbbd85c0c6e6ee8c0a6de943983ac33ec050b63a7e12c2d226d7bcde'
 $Br1FixPatch = Join-Path $PSScriptRoot 'Build-Fixes.patch'
 $Br1ManifestPath = Join-Path $SourceRoot 'diagnostics\br1_phase1\SOURCE_MANIFEST.json'
 $Br1Manifest = Get-Content -Raw -LiteralPath $Br1ManifestPath | ConvertFrom-Json
@@ -31,6 +31,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Applying reviewed Windows fixes failed.' }
 $Br1FixedHashes = @{
     'diagnostics/br1_phase1/Build-Windows.ps1' = 'fe1d5c1d17142c43fd69874ea0831e6572ec4710dc57620e2296ad0109a8bd0b'
     'source/blender/blenlib/intern/br1_diagnostics.cc' = '50f310456eb217d0f4b1d5f4f842e327e4adb1cd39dea2117338fdd60e39bdda'
+    'source/blender/python/intern/bpy_app_handlers.cc' = '1090687fa95d48c8fc35f76df1c9c27970c235f0e635b913483140a8785d7c37'
+    'source/blender/python/intern/bpy_app_timers.cc' = 'bf8679ba301d98083639aaf657d65f379bec754e1a14b4e4d76cc8ab78f838c4'
+    'source/blender/python/intern/bpy_driver.cc' = 'b01af95df539b2d8b86b3ced5a6ed3ff06527eab3243ee0577d4a143ac3a288f'
+    'source/blender/python/intern/bpy_msgbus.cc' = '70e8595d011691a7352295beff1400adc27dd32e9e5f2c2181c4f5f06807278d'
 }
 $Br1EffectiveFiles = @()
 foreach ($Br1Entry in $Br1Manifest.files) {

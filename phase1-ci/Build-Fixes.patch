@@ -21,3 +21,53 @@ diff --git a/source/blender/blenlib/intern/br1_diagnostics.cc b/source/blender/b
  #include <thread>
  #include <vector>
  
+diff --git a/source/blender/python/intern/bpy_app_handlers.cc b/source/blender/python/intern/bpy_app_handlers.cc
+--- a/source/blender/python/intern/bpy_app_handlers.cc
++++ b/source/blender/python/intern/bpy_app_handlers.cc
+@@ -10,7 +10,7 @@
+  * functions into (called via blenders generic BLI_cb API)
+  */
+ 
+-#include "py_capi_br1_diagnostics.hh"
++#include "../generic/py_capi_br1_diagnostics.hh"
+ #include <optional>
+ #include "BLI_utildefines.h"
+ #include <Python.h>
+diff --git a/source/blender/python/intern/bpy_app_timers.cc b/source/blender/python/intern/bpy_app_timers.cc
+--- a/source/blender/python/intern/bpy_app_timers.cc
++++ b/source/blender/python/intern/bpy_app_timers.cc
+@@ -6,7 +6,7 @@
+  * \ingroup pythonintern
+  */
+ 
+-#include "py_capi_br1_diagnostics.hh"
++#include "../generic/py_capi_br1_diagnostics.hh"
+ #include <optional>
+ #include "BLI_timer.h"
+ 
+diff --git a/source/blender/python/intern/bpy_driver.cc b/source/blender/python/intern/bpy_driver.cc
+--- a/source/blender/python/intern/bpy_driver.cc
++++ b/source/blender/python/intern/bpy_driver.cc
+@@ -10,9 +10,7 @@
+  * to deal with the name-space used for driver execution.
+  */
+ 
+-#ifdef WITH_PYTHON
+-#include "py_capi_br1_diagnostics.hh"
+-#endif
++#include "../generic/py_capi_br1_diagnostics.hh"
+ #include <Python.h>
+ 
+ #include "DNA_anim_types.h"
+diff --git a/source/blender/python/intern/bpy_msgbus.cc b/source/blender/python/intern/bpy_msgbus.cc
+--- a/source/blender/python/intern/bpy_msgbus.cc
++++ b/source/blender/python/intern/bpy_msgbus.cc
+@@ -7,7 +7,7 @@
+  * This file defines '_bpy_msgbus' module, exposed as 'bpy.msgbus'.
+  */
+ 
+-#include "py_capi_br1_diagnostics.hh"
++#include "../generic/py_capi_br1_diagnostics.hh"
+ #include <optional>
+ #include <Python.h>
+ 
