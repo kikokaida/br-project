@@ -60,17 +60,59 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Collect diagnostic engine and benchmark tools
+      - name: Package complete engine and benchmark tools
         if: ${{ always() && steps.build.outputs.engine_available == 'true' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: package
+        shell: pwsh
+        run: ./phase1-ci/Package-Engine.ps1
+
+      - name: Preserve engine transfer part 1
+        if: ${{ always() && steps.package.outputs.part1 == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: BR1-Phase1-Windows-x64-gameplay-unverified-${{ github.run_id }}
-          path: |
-            br1_build_job/br1_ci_work/BR1_PHASE1_engine/
-            br1_build_job/br1_ci_work/upbge/diagnostics/br1_phase1/
-            br1_build_job/br1_ci_work/logs/
+          name: BR1-Phase1-engine-part1-${{ github.run_id }}
+          path: delivery/part1/
           if-no-files-found: error
-          compression-level: 1
+          compression-level: 0
+          retention-days: 7
+
+      - name: Preserve engine transfer part 2
+        if: ${{ always() && steps.package.outputs.part2 == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: BR1-Phase1-engine-part2-${{ github.run_id }}
+          path: delivery/part2/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Preserve engine transfer part 3
+        if: ${{ always() && steps.package.outputs.part3 == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: BR1-Phase1-engine-part3-${{ github.run_id }}
+          path: delivery/part3/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Preserve engine transfer part 4
+        if: ${{ always() && steps.package.outputs.part4 == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: BR1-Phase1-engine-part4-${{ github.run_id }}
+          path: delivery/part4/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Preserve package transfer manifest
+        if: ${{ always() && steps.package.outputs.part1 == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: BR1-Phase1-package-manifest-${{ github.run_id }}
+          path: delivery/PACKAGE_TRANSFER.json
+          if-no-files-found: error
           retention-days: 7
 
       - name: Preserve compiled outputs for failure recovery
@@ -82,6 +124,7 @@ jobs:
             br1_build_job/br1_ci_work/BR1_PHASE1_engine/
             br1_build_job/br1_ci_work/BR1_PHASE1_build/bin/
             br1_build_job/br1_ci_work/BR1_PHASE1_build/Testing/
+            br1_build_job/br1_ci_work/BR1_PHASE1_build/source/creator/RelWithDebInfo/*.pdb
             br1_build_job/br1_ci_work/logs/
           if-no-files-found: warn
           compression-level: 1

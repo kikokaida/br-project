@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 # Native stderr is recorded by the transcript. Exit codes are checked explicitly.
 $PSNativeCommandUseErrorActionPreference = $false
+$env:PYTHONUTF8 = '1' # CI report paths can contain Unicode fixture names.
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     throw 'This job requires a Windows x64 build machine with Visual Studio 2022.'
@@ -94,7 +95,10 @@ try {
 
     $Br1Stage = 'apply and verify reviewed Windows build fixes'
     & (Join-Path $PSScriptRoot '..\phase1-ci\Apply-Build-Fixes.ps1') -SourceRoot $Br1Source -LogsDir $Br1Logs
-    $Br1Result['source_hashes'] = 'PASS: original and effective manifests (56 files each)'
+    $Br1Result['source_hashes'] = 'PASS: 56 original diagnostic hashes and all effective source hashes'
+
+    $Br1Stage = 'disabled-profiler allocation regression'
+    & (Join-Path $PSScriptRoot '..\phase1-tests\Test-Disabled-Allocations.ps1') -SourceRoot $Br1Source -WorkDir (Join-Path $Br1RunRoot 'allocation_test') -LogsDir $Br1Logs
 
     $Br1Stage = 'native build and tests; see transcript for failing command'
     & (Join-Path $Br1Source 'diagnostics\br1_phase1\Build-Windows.ps1') -Jobs $Jobs
@@ -128,7 +132,7 @@ try {
     $Br1Result['finished_utc'] = [DateTime]::UtcNow.ToString('o')
     $Br1Result | ConvertTo-Json -Depth 6 |
         Set-Content -Encoding utf8 (Join-Path $Br1Logs 'BUILD_STATUS.json')
-    foreach ($Br1Name in @('DEPENDENCY_LOCK.json', 'CMakeCache.txt', 'RECORDER_TESTS.log', 'ENGINE_TESTS.log', 'RECORDER_TESTS.xml', 'ENGINE_TESTS.xml')) {
+    foreach ($Br1Name in @('DEPENDENCY_LOCK.json', 'ADDON_DEPENDENCY_LOCK.json', 'CMakeCache.txt', 'RECORDER_TESTS.log', 'ENGINE_TESTS.log', 'RECORDER_TESTS.xml', 'ENGINE_TESTS.xml')) {
         $Br1Log = Join-Path $Br1Build $Br1Name
         if (Test-Path -LiteralPath $Br1Log) {
             Copy-Item -LiteralPath $Br1Log -Destination $Br1Logs -ErrorAction Continue

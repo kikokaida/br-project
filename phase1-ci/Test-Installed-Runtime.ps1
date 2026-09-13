@@ -9,6 +9,7 @@ $Br1Logs = Join-Path $Br1Root 'logs'
 $Br1Checks = @(
     @{ name = 'blender_version'; exe = 'blender.exe'; arguments = @('--version') },
     @{ name = 'player_help'; exe = 'blenderplayer.exe'; arguments = @('-h') },
+    @{ name = 'blender_guarded_background'; exe = 'blender.exe'; arguments = @('--debug-memory', '--background', '--factory-startup', '--python-exit-code', '1', '--python-expr', 'import bpy; print("BR1_GUARDED_RUNTIME_BODY_PASSED")') },
     @{ name = 'blender_background_python'; exe = 'blender.exe'; arguments = @('--background', '--factory-startup', '--python-exit-code', '1', '--python-expr', 'import bpy, mathutils, sys; print("BR1_RUNTIME_PYTHON", sys.version); print("BR1_RUNTIME_VERSION", bpy.app.version_string); print("BR1_RUNTIME_RESOURCES", bpy.utils.resource_path("LOCAL"))') }
 )
 $Br1Results = @()

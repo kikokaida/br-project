@@ -71,12 +71,16 @@ try {
     Write-Host $Br1Status.source_hashes
     $Br1Status.stage = 'apply and verify reviewed Windows build fixes'
     & (Join-Path $PSScriptRoot '..\phase1-ci\Apply-Build-Fixes.ps1') -SourceRoot $Br1Source -LogsDir $Br1Logs
-    $Br1Status['effective_source_hashes'] = 'PASS (56 files)'
+    $Br1Status['effective_source_hashes'] = 'PASS (56 diagnostic files plus reviewed baseline fixes)'
     $Br1Gitlink = git -C $Br1Source ls-tree $Br1Commit lib/windows_x64
     Check-Br1Exit 'Resolve upstream dependency gitlink'
     if ($Br1Gitlink -notmatch ('^160000 commit ' + $Br1LibCommit + '\s+lib/windows_x64$')) {
         throw 'The Windows library commit does not match the pinned engine.'
     }
+
+    $Br1Status.stage = 'disabled-profiler allocation regression'
+    & (Join-Path $PSScriptRoot 'Test-Disabled-Allocations.ps1') -SourceRoot $Br1Source -WorkDir (Join-Path $Br1Work 'allocation_test') -LogsDir $Br1Logs
+    $Br1Status['disabled_no_allocations'] = 'PASS'
 
     $Br1Status.stage = 'fetch pinned Python libraries'
     git init $Br1Lib

@@ -1,16 +1,36 @@
 diff --git a/diagnostics/br1_phase1/Build-Windows.ps1 b/diagnostics/br1_phase1/Build-Windows.ps1
 --- a/diagnostics/br1_phase1/Build-Windows.ps1
 +++ b/diagnostics/br1_phase1/Build-Windows.ps1
-@@ -35,7 +35,7 @@
+@@ -35,7 +35,27 @@
      throw 'Exact Windows dependency gitlink could not be resolved; do not substitute arbitrary libraries.'
  }
  $LibraryCommit = $Matches[1]
 -$LibDir = Join-Path $SourceRoot 'lib\windows_x64'
++# Materialize the four stock add-ons at the exact gitlinks of the pinned source.
++$Br1AddonCommits = [ordered]@{
++    'scripts/addons_core/bge_bricknodes' = 'fa2033b4c2c7977d3eba06f95e543a2cc31dfcb9'
++    'scripts/addons_core/bge_easyonline' = 'cbec75b92ed76163e7217e77099ee87b32ecaf48'
++    'scripts/addons_core/bge_netlogic' = '4447c9681055f7b29533f26760bdcfd825d567b5'
++    'scripts/addons_core/bge_thelightmapper' = 'c71a029a26339ecabbb17a57c242d6b2419fef4f'
++}
++foreach ($Br1Addon in $Br1AddonCommits.Keys) {
++    $Br1Link = git -C $SourceRoot ls-tree $SourceCommit $Br1Addon
++    Check-Exit 'Read pinned add-on gitlink'
++    if ($Br1Link -notmatch ('^160000 commit ' + $Br1AddonCommits[$Br1Addon] + '\s+')) {
++        throw "Unexpected add-on gitlink: $Br1Addon"
++    }
++    git -C $SourceRoot submodule update --init --recursive --depth 1 -- $Br1Addon
++    Check-Exit "Fetch pinned add-on $Br1Addon"
++    $Br1AddonHead = git -C (Join-Path $SourceRoot $Br1Addon) rev-parse HEAD
++    Check-Exit 'Verify add-on checkout'
++    if ($Br1AddonHead -ne $Br1AddonCommits[$Br1Addon]) { throw "Add-on commit mismatch: $Br1Addon" }
++}
++$Br1AddonCommits | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $BuildRoot 'ADDON_DEPENDENCY_LOCK.json')
 +$LibDir = (Join-Path $SourceRoot 'lib\windows_x64').Replace('\', '/')
  if (!(Test-Path (Join-Path $LibDir '.git'))) {
      git clone --no-checkout https://projects.blender.org/blender/lib-windows_x64.git $LibDir
      Check-Exit 'Clone isolated Windows libraries'
-@@ -59,6 +59,15 @@
+@@ -59,6 +79,15 @@
  Check-Exit 'Compile and link UPBGE'
  cmake --install $BuildRoot --config RelWithDebInfo
  Check-Exit 'Install separate diagnostic engine'
@@ -26,7 +46,7 @@ diff --git a/diagnostics/br1_phase1/Build-Windows.ps1 b/diagnostics/br1_phase1/B
  foreach ($Executable in @('blender.exe', 'blenderplayer.exe')) {
      if (!(Test-Path (Join-Path $InstallRoot $Executable))) { throw "Missing installed $Executable" }
  }
-@@ -74,11 +83,13 @@
+@@ -74,11 +103,13 @@
  try {
      $env:PATH = "$PythonDir\bin;$PythonDir;$SavedPath"
      ctest --test-dir $TestsRoot -C RelWithDebInfo --output-on-failure `
@@ -53,6 +73,78 @@ diff --git a/source/blender/blenlib/intern/br1_diagnostics.cc b/source/blender/b
  #include <thread>
  #include <vector>
  
+@@ -36,8 +37,9 @@
+   std::vector<Event> events;
+   bool partial = false;
+ };
++// Disabled profiling queries must not construct heap-owning recorder state.
++std::atomic<bool> recording_active{false};
+ struct State {
+-  std::atomic<bool> active{false};
+   std::mutex registry_mutex, queue_mutex;
+   std::vector<std::shared_ptr<Buffer>> buffers;
+   std::deque<Packet> queue;
+@@ -182,8 +184,9 @@
+ }
+ void boundary(bool partial)
+ {
+-  State &s = state();
+-  if (!s.active || std::this_thread::get_id() != s.main_thread) { return; }
++  if (!recording_active) { return; }
++  State &s = state();
++  if (std::this_thread::get_id() != s.main_thread) { return; }
+   const uint64_t end = now_ns();
+   emit_phase(end);
+   Packet packet;
+@@ -222,13 +225,13 @@
+   return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(
+       std::chrono::steady_clock::now().time_since_epoch()).count());
+ }
+-bool enabled() { return state().active.load(std::memory_order_acquire); }
++bool enabled() { return recording_active.load(std::memory_order_acquire); }
+ bool python_detail_enabled() { return enabled() && state().python_detail; }
+ void start_session()
+ {
+-  State &s = state();
+   const char *flag = std::getenv("BR1_DIAG");
+-  if (s.active || !flag || std::strcmp(flag, "1")) { return; }
++  if (recording_active || !flag || std::strcmp(flag, "1")) { return; }
++  State &s = state();
+   s.main_thread = std::this_thread::get_id();
+   s.generation++; s.buffers.clear(); s.queue.clear();
+   s.frame = 0; s.done = false; s.limit_reached = false;
+@@ -258,15 +261,15 @@
+   buffer();  // Register the main thread first, deterministically.
+   s.frame_start = s.phase_start = now_ns(); s.current_phase = 9;
+   s.writer = std::thread(write_loop);
+-  s.active = true;
++  recording_active = true;
+   std::fprintf(stderr, "BR1_DIAG: recording Phase 1 CPU diagnostics.\n");
+ }
+ void stop_session()
+ {
+-  State &s = state();
+-  if (!s.active) { return; }
++  if (!recording_active) { return; }
++  State &s = state();
+   boundary(true);
+-  s.active = false;
++  recording_active = false;
+   uint64_t open_scopes = 0;
+   {
+     std::lock_guard<std::mutex> lock(s.registry_mutex);
+@@ -294,8 +297,9 @@
+ void frame_boundary() { boundary(false); }
+ void phase(int category)
+ {
+-  State &s = state();
+-  if (!s.active || std::this_thread::get_id() != s.main_thread) { return; }
++  if (!recording_active) { return; }
++  State &s = state();
++  if (std::this_thread::get_id() != s.main_thread) { return; }
+   emit_phase(now_ns()); s.current_phase = category;
+ }
+ Scope::Scope(Domain domain, const char *category, const char *name,
 diff --git a/source/blender/python/intern/bpy_app_handlers.cc b/source/blender/python/intern/bpy_app_handlers.cc
 --- a/source/blender/python/intern/bpy_app_handlers.cc
 +++ b/source/blender/python/intern/bpy_app_handlers.cc
@@ -103,3 +195,116 @@ diff --git a/source/blender/python/intern/bpy_msgbus.cc b/source/blender/python/
  #include <optional>
  #include <Python.h>
  
+diff --git a/source/blender/blenkernel/intern/node.cc b/source/blender/blenkernel/intern/node.cc
+--- a/source/blender/blenkernel/intern/node.cc
++++ b/source/blender/blenkernel/intern/node.cc
+@@ -2311,13 +2311,13 @@
+   return *value;
+ }
+ 
+-ResourceScope *scope1 = MEM_new<ResourceScope>("scope1");
++ResourceScope *scope1 = nullptr;
+ static void defer_free_tree_type(bNodeTreeType *tree_type)
+ {
+   scope1->add_destruct_call([tree_type]() { MEM_delete(tree_type); });
+ }
+ 
+-ResourceScope *scope2 = MEM_new<ResourceScope>("scope2");
++ResourceScope *scope2 = nullptr;
+ static void defer_free_node_type(bNodeType *ntype)
+ {
+   scope2->add_destruct_call([ntype]() {
+@@ -2328,7 +2328,7 @@
+   });
+ }
+ 
+-ResourceScope *scope3 = MEM_new<ResourceScope>("scope3");
++ResourceScope *scope3 = nullptr;
+ static void defer_free_socket_type(bNodeSocketType *stype)
+ {
+   scope3->add_destruct_call([stype]() {
+@@ -5427,6 +5427,17 @@
+ 
+ void node_system_init()
+ {
++  /* Create these after main() selects the guarded or lock-free allocator.
++   * Global MEM allocations would otherwise be freed by a different allocator. */
++  if (!scope1) {
++    scope1 = MEM_new<ResourceScope>("scope1");
++  }
++  if (!scope2) {
++    scope2 = MEM_new<ResourceScope>("scope2");
++  }
++  if (!scope3) {
++    scope3 = MEM_new<ResourceScope>("scope3");
++  }
+   register_nodes();
+ }
+ 
+@@ -5460,9 +5471,9 @@
+     }
+     ntree_free_type(nt);
+   }
+-  MEM_delete(scope1);
+-  MEM_delete(scope2);
+-  MEM_delete(scope3);
++  MEM_SAFE_DELETE(scope1);
++  MEM_SAFE_DELETE(scope2);
++  MEM_SAFE_DELETE(scope3);
+ }
+ 
+ /* -------------------------------------------------------------------- */
+diff --git a/source/gameengine/GamePlayer/GPG_ghost.cpp b/source/gameengine/GamePlayer/GPG_ghost.cpp
+--- a/source/gameengine/GamePlayer/GPG_ghost.cpp
++++ b/source/gameengine/GamePlayer/GPG_ghost.cpp
+@@ -40,6 +40,8 @@
+ #  pragma comment(lib, "tbbmalloc_proxy.lib")
+ #  pragma comment(linker, "/include:__TBB_malloc_proxy")
+ #endif
++
++#include <cstring>
+ 
+ #include "BKE_addon.h"
+ #include "BKE_appdir.hh"
+@@ -744,6 +746,18 @@
+ #endif
+ )
+ {
++  /* A standalone help request has no window manager to shut down. Handle it
++   * before creating engine subsystems; normal game argument handling is unchanged. */
++#ifdef WIN32
++  char **help_argv = argv_c;
++#else
++  char **help_argv = argv;
++#endif
++  if (argc == 2 && std::strcmp(help_argv[1], "-h") == 0) {
++    usage(help_argv[0], !BLO_is_a_runtime(help_argv[0]));
++    return 0;
++  }
++
+   int i;
+   int argc_py_clamped = argc; /* use this so python args can be added after ' - ' */
+   bool error = false;
+diff --git a/tests/files/asset_library/новый/blender_assets.cats.txt b/tests/files/asset_library/новый/blender_assets.cats.txt
+--- a/tests/files/asset_library/новый/blender_assets.cats.txt
++++ b/tests/files/asset_library/новый/blender_assets.cats.txt
+@@ -1,4 +1,3 @@
+-<<<<<<< HEAD
+ # This is an Asset Catalog Definition file for Blender.
+ #
+ # Empty lines and lines starting with `#` will be ignored.
+@@ -8,14 +7,3 @@
+ VERSION 1
+ 
+ a2151dff-dead-4f29-b6bc-b2c7d6cccdb4:Материалы:Russian Materials
+-=======
+-# This is an Asset Catalog Definition file for Blender.
+-#
+-# Empty lines and lines starting with `#` will be ignored.
+-# The first non-ignored line should be the version indicator.
+-# Other lines are of the format "UUID:catalog/path/for/assets:simple catalog name"
+-
+-VERSION 1
+-
+-a2151dff-dead-4f29-b6bc-b2c7d6cccdb4:Материалы:Russian Materials
+->>>>>>> bbfc97ad6f5 (Move tests/data and assets to the main repository)
