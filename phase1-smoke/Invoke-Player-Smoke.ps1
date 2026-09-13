@@ -32,6 +32,9 @@ function Invoke-Br1Process([string]$Executable, [string[]]$Arguments, [string]$L
     $Br1Result = [ordered]@{label=$Label; exit_code=$Br1Process.ExitCode; timed_out=(!$Br1Finished); arguments=$Arguments}
     $Br1Result | ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $LogDir ($Label + '.process.json'))
     $Br1Process.Dispose()
+    foreach ($Br1Crash in @(Get-ChildItem -LiteralPath $env:TEMP -Filter '*crash*.txt' -File -ErrorAction SilentlyContinue)) {
+        Copy-Item -LiteralPath $Br1Crash.FullName -Destination (Join-Path $LogDir ($Label + '.' + $Br1Crash.Name))
+    }
     if (!$Br1Finished) { throw "$Label timed out after $TimeoutSeconds seconds" }
     if ($Br1Result.exit_code -ne 0) { throw "$Label exited with $($Br1Result.exit_code)" }
 }
@@ -69,8 +72,12 @@ try {
         ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 (Join-Path $Br1Logs 'VIDEO_ADAPTERS.json')
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'br1_smoke_component.py') -Destination $Br1Fixture
     $env:PYTHONUTF8 = '1'
+    $env:PYTHONUNBUFFERED = '1'
     $env:BR1_DIAG = '0'
     $env:BR1_SMOKE_FIXTURE_DIR = $Br1Fixture
+    $Br1Status.stage = 'check relocated background runtime'
+    Invoke-Br1Process (Join-Path $Br1Engine 'blender.exe') @('--background','--factory-startup','--python-exit-code','1','--python-expr','import bpy; print("BR1_RELOCATED_RUNTIME_READY", flush=True)') 'relocated_background' $Br1Logs
+    $Br1Status['relocated_background'] = 'PASS'
     $Br1Status.stage = 'create synthetic fixture'
     Invoke-Br1Process (Join-Path $Br1Engine 'blender.exe') @('--background','--factory-startup','--python-exit-code','1','--python',(Join-Path $PSScriptRoot 'Create-Fixture.py')) 'create_fixture' $Br1Logs
     $Br1Blend = Join-Path $Br1Fixture 'BR1_Phase1_Smoke.blend'
